@@ -20,27 +20,16 @@ class MainScene extends Phaser.Scene {
 
     // Load the princess sprite
     this.load.image('prinsessa', '/sprites/prinsessa.png');
+
+    // Load the tilemap and tileset
+    this.load.tilemapTiledJSON('dragonzmap', '/maps/dragonzmap.json');
+    this.load.image('textures', '/tilemaps/texturesfordragonz.png');
   }
 
   create() {
-    // Create the ground with holes
-    const ground = this.add.group();
-    for (let i = 0; i < 800; i += 100) {
-      if (i !== 300 && i !== 600) {
-        const groundBlock = this.add.rectangle(i, 580, 100, 20, 0x654321);
-        this.physics.add.existing(groundBlock, true);
-        ground.add(groundBlock);
-      }
-    }
-
-    // Create platforms
-    const platforms = this.add.group();
-    const platform1 = this.add.rectangle(200, 400, 150, 20, 0x888888);
-    const platform2 = this.add.rectangle(500, 300, 150, 20, 0x888888);
-    this.physics.add.existing(platform1, true);
-    this.physics.add.existing(platform2, true);
-    platforms.add(platform1);
-    platforms.add(platform2);
+    // Extend the playable area
+    this.physics.world.setBounds(0, 0, 3200, 600);
+    this.cameras.main.setBounds(0, 0, 3200, 600);
 
     // Create the player (prince)
     this.player = this.physics.add.sprite(50, 500, 'prinz')
@@ -48,6 +37,8 @@ class MainScene extends Phaser.Scene {
     this.player.body?.setSize(15, 45);
     this.player.body?.setOffset(24, 12)
     this.player.setCollideWorldBounds(false); // Allow the player to fall off the screen
+    this.cameras.main.startFollow(this.player);
+
 
     // Set the dragons to yellow
     this.dragons = this.physics.add.group();
@@ -64,12 +55,37 @@ class MainScene extends Phaser.Scene {
     this.princess.body?.setSize(40, 80);
     this.princess.body?.setOffset(44, 40);
 
-    // Add collisions
-    this.physics.add.collider(this.player, ground);
-    this.physics.add.collider(this.player, platforms);
-    this.physics.add.collider(this.dragons, ground);
-    this.physics.add.collider(this.dragons, platforms);
-    this.physics.add.collider(this.princess, ground);
+    // Add the tilemap to the scene
+    const map = this.make.tilemap({ key: 'dragonzmap' });
+    const tileset = map.addTilesetImage('texturesfordragonz', 'textures');
+
+    // Ensure tileset is not null
+    if (!tileset) {
+      throw new Error("Tileset 'texturesfordragonz' could not be loaded.");
+    }
+
+    // Create layers from the tilemap
+    const platformsLayer = map.createLayer('platforms', tileset);
+    const wallsLayer = map.createLayer('walls', tileset);
+    const lavaLayer = map.createLayer('lava', tileset);
+
+    // Ensure layers are not null
+    if (!platformsLayer || !wallsLayer) {
+      throw new Error("One or more layers could not be created from the tilemap.");
+    }
+
+    // Enable collision for the layers
+    platformsLayer.setCollisionByProperty({ collides: true });
+    wallsLayer.setCollisionByProperty({ collides: true });
+
+    // Add collisions between the player and the layers
+    this.physics.add.collider(this.player, platformsLayer);
+    this.physics.add.collider(this.player, wallsLayer);
+
+    // Add collisions for dragons and princess
+    this.physics.add.collider(this.dragons, platformsLayer);
+    this.physics.add.collider(this.dragons, wallsLayer);
+    this.physics.add.collider(this.princess, platformsLayer);
 
     // Add overlap for saving the princess
     this.physics.add.overlap(
@@ -144,6 +160,12 @@ class MainScene extends Phaser.Scene {
       const bullet = this.add.rectangle(bulletX, this.player.y - 17, 7, 3, 0xffff00);
       this.physics.add.existing(bullet);
       (bullet.body as Phaser.Physics.Arcade.Body).velocity.x = bulletVelocity;
+
+      // Add collision detection between bullets and dragons
+      this.physics.add.overlap(bullet, this.dragons, (bullet, dragon) => {
+        (bullet as Phaser.GameObjects.Rectangle).destroy(); // Destroy the bullet
+        (dragon as Phaser.Physics.Arcade.Sprite).destroy(); // Destroy the dragon
+      });
     }
   }
 
