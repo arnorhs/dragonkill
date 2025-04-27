@@ -39,8 +39,11 @@ class MainScene extends Phaser.Scene {
     platforms.add(platform2);
 
     // Create the player (prince)
-    this.player = this.physics.add.sprite(50, 500, '').setDisplaySize(40, 60).setTint(0x0000ff);
-    this.player.setCollideWorldBounds(true);
+    this.player = this.physics.add.sprite(50, 500, '').setDisplaySize(32, 32)
+    //this.player.body?.setOffset(17, 28)
+    this.player.body?.setSize(15, 45);
+    this.player.body?.setOffset(24, 12)
+    this.player.setCollideWorldBounds(false); // Allow the player to fall off the screen
 
     // Create dragons
     this.dragons = this.physics.add.group();
@@ -76,11 +79,11 @@ class MainScene extends Phaser.Scene {
 
     // Enable debug mode for physics
     this.physics.world.createDebugGraphic();
+    const debugGraphic = this.physics.world.debugGraphic;
+    debugGraphic.setVisible(false)
 
     // Add a toggle for the debug overlay using the D key
-    const debugKey = this.input.keyboard.addKey('D');
-    debugKey.on('down', () => {
-      const debugGraphic = this.physics.world.debugGraphic;
+    this.input.keyboard?.addKey('I')?.on('down', () => {
       debugGraphic.setVisible(!debugGraphic.visible);
     });
 
@@ -117,7 +120,13 @@ class MainScene extends Phaser.Scene {
     }
 
     if (this.cursors.up?.isDown && this.player.body!.touching.down) {
-      this.player.setVelocityY(-330);
+      this.player.setVelocityY(-460); // Double the jump velocity
+    }
+
+    // Check if player falls off screen
+    if (this.player.y > this.scale.height) {
+      this.player.setActive(false).setVisible(false); // Disable player
+      this.scene.restart(); // Restart the game
     }
 
     // Shooting (space key)
