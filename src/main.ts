@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 
 class MainScene extends Phaser.Scene {
+  private map!: Phaser.Tilemaps.Tilemap;
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys | null;
   private dragons!: Phaser.Physics.Arcade.Group;
-  private princess!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+  private princess!: Phaser.Physics.Arcade.Sprite;
   private lastDirection: 'left' | 'right' = 'right'; // Track the last direction the player was facing
 
   constructor() {
@@ -20,46 +21,82 @@ class MainScene extends Phaser.Scene {
 
     // Load the princess sprite
     this.load.image('prinsessa', '/sprites/prinsessa.png');
+    this.load.spritesheet('dragon', '/sprites/chatgptdragon.png', { frameWidth: 64, frameHeight: 64 });
 
     // Load the tilemap and tileset
     this.load.tilemapTiledJSON('dragonzmap', '/maps/dragonzmap.json');
     this.load.image('textures', '/tilemaps/texturesfordragonz.png');
   }
 
-  create() {
-    // Create the player (prince)
-    this.player = this.physics.add.sprite(50, 500, 'prinz')
-    //this.player.body?.setOffset(17, 28)
+  createPlayer() {
+    this.player = (this.map.createFromObjects('items', {
+      name: 'player',
+      classType: Phaser.Physics.Arcade.Sprite,
+      scene: this
+    }) as Phaser.Physics.Arcade.Sprite[])[0];
+    this.physics.world.enable(this.player)
+    this.player.setTexture('prinz');
     this.player.body?.setSize(15, 45);
     this.player.body?.setOffset(24, 12)
     this.player.setCollideWorldBounds(false); // Allow the player to fall off the screen
-    this.cameras.main.startFollow(this.player);
+  }
 
-
-    // Set the dragons to yellow
-    this.dragons = this.physics.add.group();
-    for (let i = 0; i < 3; i++) {
-      const dragon = this.physics.add.sprite(200 + i * 200, 500, '').setDisplaySize(40, 40).setTint(0xffff00);
-      dragon.setVelocityX(50 * (i % 2 === 0 ? 1 : -1));
-      dragon.setCollideWorldBounds(true);
-      dragon.setBounce(1);
-      this.dragons.add(dragon);
-    }
-
-    // Create the princess
-    this.princess = this.physics.add.sprite(700, 400, 'prinsessa').setScale(0.4);
+  createPrincess() {
+    this.princess = (this.map.createFromObjects('items', {
+      name: 'princess',
+      classType: Phaser.Physics.Arcade.Sprite,
+      scene: this
+    }) as Phaser.Physics.Arcade.Sprite[])[0];
+    this.physics.world.enable(this.princess)
+    this.princess.setTexture('prinsessa');
     this.princess.body?.setSize(40, 80);
     this.princess.body?.setOffset(44, 40);
+  }
 
+  createDragons() {
+    this.dragons = this.physics.add.group();
+
+    const dragons = this.map.createFromObjects('items', {
+      name: 'dragon',
+      classType: Phaser.Physics.Arcade.Sprite,
+    }) as Phaser.Physics.Arcade.Sprite[];
+
+    this.dragons.addMultiple(dragons);
+
+    this.physics.world.enable(this.dragons);
+
+    let vel = -1
+    for (const dragon of dragons) {
+      dragon.setTexture('dragon');
+      dragon.setVelocityX(50 * vel);
+      vel *= -1
+      dragon.setCollideWorldBounds(true, 0, 0, true)
+      dragon.body?.setSize(40, 40);
+
+    }
+  }
+
+  create() {
     // Add the tilemap to the scene
-    const map = this.make.tilemap({ key: 'dragonzmap' });
-    const tileset = map.addTilesetImage('texturesfordragonz', 'textures');
+    this.map = this.make.tilemap({ key: 'dragonzmap' });
+    const tileset = this.map.addTilesetImage('texturesfordragonz', 'textures');
 
-    const [playerPosition] = map.createFromObjects('items', {
-      name: 'player'
-    }) as Phaser.GameObjects.Sprite[];
 
-    this.player.setPosition(playerPosition.x, playerPosition.y)
+
+    this.createPlayer()
+    this.createPrincess()
+    this.createDragons()
+
+    this.cameras.main.startFollow(this.player);
+
+    this.physics.world.on(
+      "worldbounds",
+      (body: Phaser.Physics.Arcade.Body, _blockedUp:boolean, blockedDown:boolean, _blockedLeft:boolean, _blockedRight:boolean) => {
+        if (blockedDown && this.dragons.contains(body.gameObject) && body.gameObject instanceof Phaser.Physics.Arcade.Sprite) {
+          this.dragons.remove(body.gameObject, true, true)
+        }
+      }
+    );
 
     // Ensure tileset is not null
     if (!tileset) {
@@ -67,9 +104,9 @@ class MainScene extends Phaser.Scene {
     }
 
     // Create layers from the tilemap
-    const platformsLayer = map.createLayer('platforms', tileset);
-    const wallsLayer = map.createLayer('walls', tileset);
-    const lavaLayer = map.createLayer('lava', tileset);
+    const platformsLayer = this.map.createLayer('platforms', tileset);
+    const wallsLayer = this.map.createLayer('walls', tileset);
+    const lavaLayer = this.map.createLayer('lava', tileset);
 
     // Ensure layers are not null
     if (!platformsLayer || !wallsLayer) {
