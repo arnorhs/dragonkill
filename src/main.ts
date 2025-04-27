@@ -1,0 +1,151 @@
+import Phaser from 'phaser';
+
+class MainScene extends Phaser.Scene {
+  private player!: Phaser.Physics.Arcade.Sprite;
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys | null;
+  private dragons!: Phaser.Physics.Arcade.Group;
+  private princess!: Phaser.GameObjects.Rectangle;
+
+  constructor() {
+    super('MainScene');
+  }
+
+  preload() {
+    // Load the player sprite sheet
+    this.load.spritesheet('prinz', 'public/sprites/prinz.png', {
+      frameWidth: 64,
+      frameHeight: 64,
+    });
+  }
+
+  create() {
+    // Create the ground with holes
+    const ground = this.add.group();
+    for (let i = 0; i < 800; i += 100) {
+      if (i !== 300 && i !== 600) {
+        const groundBlock = this.add.rectangle(i, 580, 100, 20, 0x654321);
+        this.physics.add.existing(groundBlock, true);
+        ground.add(groundBlock);
+      }
+    }
+
+    // Create platforms
+    const platforms = this.add.group();
+    const platform1 = this.add.rectangle(200, 400, 150, 20, 0x888888);
+    const platform2 = this.add.rectangle(500, 300, 150, 20, 0x888888);
+    this.physics.add.existing(platform1, true);
+    this.physics.add.existing(platform2, true);
+    platforms.add(platform1);
+    platforms.add(platform2);
+
+    // Create the player (prince)
+    this.player = this.physics.add.sprite(50, 500, '').setDisplaySize(40, 60).setTint(0x0000ff);
+    this.player.setCollideWorldBounds(true);
+
+    // Create dragons
+    this.dragons = this.physics.add.group();
+    for (let i = 0; i < 3; i++) {
+      const dragon = this.physics.add.sprite(200 + i * 200, 500, '').setDisplaySize(40, 40).setTint(0xff0000);
+      dragon.setVelocityX(50 * (i % 2 === 0 ? 1 : -1));
+      dragon.setCollideWorldBounds(true);
+      dragon.setBounce(1);
+      this.dragons.add(dragon);
+    }
+
+    // Create the princess
+    this.princess = this.add.rectangle(750, 500, 40, 60, 0xffc0cb);
+    this.physics.add.existing(this.princess, true);
+
+    // Add collisions
+    this.physics.add.collider(this.player, ground);
+    this.physics.add.collider(this.player, platforms);
+    this.physics.add.collider(this.dragons, ground);
+    this.physics.add.collider(this.dragons, platforms);
+
+    // Add overlap for saving the princess
+    this.physics.add.overlap(
+      this.player,
+      this.princess,
+      () => this.savePrincess(),
+      undefined,
+      this
+    );
+
+    // Add keyboard controls
+    this.cursors = this.input.keyboard!.createCursorKeys();
+
+    // Enable debug mode for physics
+    this.physics.world.createDebugGraphic();
+
+    // Add a toggle for the debug overlay using the D key
+    const debugKey = this.input.keyboard.addKey('D');
+    debugKey.on('down', () => {
+      const debugGraphic = this.physics.world.debugGraphic;
+      debugGraphic.setVisible(!debugGraphic.visible);
+    });
+
+    // Create player animations
+    this.anims.create({
+      key: 'idle',
+      frames: [{ key: 'prinz', frame: 0 }],
+      frameRate: 10,
+    });
+
+    this.anims.create({
+      key: 'run-right',
+      frames: this.anims.generateFrameNumbers('prinz', { start: 8, end: 15 }),
+      frameRate: 10,
+      repeat: -1,
+    });
+  }
+
+  update() {
+    if (!this.cursors) return;
+
+    // Player movement
+    if (this.cursors.left?.isDown) {
+      this.player.setVelocityX(-160);
+      this.player.anims.play('run-right', true);
+      this.player.setFlipX(true); // Mirror the sprite for left movement
+    } else if (this.cursors.right?.isDown) {
+      this.player.setVelocityX(160);
+      this.player.anims.play('run-right', true);
+      this.player.setFlipX(false); // Default orientation for right movement
+    } else {
+      this.player.setVelocityX(0);
+      this.player.anims.play('idle', true);
+    }
+
+    if (this.cursors.up?.isDown && this.player.body!.touching.down) {
+      this.player.setVelocityY(-330);
+    }
+
+    // Shooting (space key)
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.space!)) {
+      const bullet = this.add.rectangle(this.player.x, this.player.y, 10, 5, 0xffff00);
+      this.physics.add.existing(bullet);
+      (bullet.body as Phaser.Physics.Arcade.Body).velocity.x = 300;
+    }
+  }
+
+  savePrincess() {
+    this.scene.pause();
+    this.add.text(400, 300, 'You saved the princess!', { fontSize: '32px', color: '#ffffff' }).setOrigin(0.5);
+  }
+}
+
+const config: Phaser.Types.Core.GameConfig = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { x: 0, y: 500 },
+      debug: false,
+    },
+  },
+  scene: MainScene,
+};
+
+new Phaser.Game(config);
