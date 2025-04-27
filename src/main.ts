@@ -1,4 +1,5 @@
 import Phaser from "phaser"
+import GameOverScene from "./scenes/GameOverScene"
 
 class MainScene extends Phaser.Scene {
   private map!: Phaser.Tilemaps.Tilemap
@@ -177,6 +178,7 @@ class MainScene extends Phaser.Scene {
     this.physics.add.collider(this.dragons, platformsLayer)
     this.physics.add.collider(this.dragons, wallsLayer)
     this.physics.add.collider(this.princess, platformsLayer)
+    this.physics.add.collider(this.princess, wallsLayer)
 
     // Add overlap for saving the princess
     this.physics.add.overlap(
@@ -254,13 +256,7 @@ class MainScene extends Phaser.Scene {
   }
 
   savePrincess() {
-    this.scene.pause()
-    this.add
-      .text(400, 300, "You saved the princess!", {
-        fontSize: "32px",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5)
+    this.scene.start("GameOverScene")
   }
 }
 
@@ -275,7 +271,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: MainScene,
+  scene: [MainScene, GameOverScene],
 }
 
 new Phaser.Game(config)
