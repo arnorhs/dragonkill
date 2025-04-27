@@ -27,10 +27,6 @@ class MainScene extends Phaser.Scene {
   }
 
   create() {
-    // Extend the playable area
-    this.physics.world.setBounds(0, 0, 3200, 600);
-    this.cameras.main.setBounds(0, 0, 3200, 600);
-
     // Create the player (prince)
     this.player = this.physics.add.sprite(50, 500, 'prinz')
     //this.player.body?.setOffset(17, 28)
@@ -59,6 +55,12 @@ class MainScene extends Phaser.Scene {
     const map = this.make.tilemap({ key: 'dragonzmap' });
     const tileset = map.addTilesetImage('texturesfordragonz', 'textures');
 
+    const [playerPosition] = map.createFromObjects('items', {
+      name: 'player'
+    }) as Phaser.GameObjects.Sprite[];
+
+    this.player.setPosition(playerPosition.x, playerPosition.y)
+
     // Ensure tileset is not null
     if (!tileset) {
       throw new Error("Tileset 'texturesfordragonz' could not be loaded.");
@@ -73,6 +75,10 @@ class MainScene extends Phaser.Scene {
     if (!platformsLayer || !wallsLayer) {
       throw new Error("One or more layers could not be created from the tilemap.");
     }
+
+    // Extend the playable area
+this.physics.world.setBounds(0, 0, wallsLayer.width, wallsLayer.height);
+    this.cameras.main.setBounds(0, 0, this.physics.world.bounds.width, this.physics.world.bounds.height);
 
     // Enable collision for the layers
     platformsLayer.setCollisionByProperty({ collides: true });
@@ -122,6 +128,13 @@ class MainScene extends Phaser.Scene {
       frameRate: 10,
       repeat: -1,
     });
+
+    this.anims.create({
+      key: 'jump-right',
+      frames: this.anims.generateFrameNumbers('prinz', { start: 8, end: 15 }),
+      frameRate: 5,
+      repeat: -1,
+    });
   }
 
   update() {
@@ -143,12 +156,12 @@ class MainScene extends Phaser.Scene {
       this.player.anims.play('idle', true);
     }
 
-    if (this.cursors.up?.isDown && this.player.body!.touching.down) {
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
       this.player.setVelocityY(-550); // Double the jump velocity
     }
 
     // Check if player falls off screen
-    if (this.player.y > this.scale.height) {
+    if (this.player.y > this.physics.world.bounds.height) {
       this.player.setActive(false).setVisible(false); // Disable player
       this.scene.restart(); // Restart the game
     }
