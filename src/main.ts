@@ -5,6 +5,7 @@ class MainScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys | null;
   private dragons!: Phaser.Physics.Arcade.Group;
   private princess!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+  private lastDirection: 'left' | 'right' = 'right'; // Track the last direction the player was facing
 
   constructor() {
     super('MainScene');
@@ -48,10 +49,10 @@ class MainScene extends Phaser.Scene {
     this.player.body?.setOffset(24, 12)
     this.player.setCollideWorldBounds(false); // Allow the player to fall off the screen
 
-    // Create dragons
+    // Set the dragons to yellow
     this.dragons = this.physics.add.group();
     for (let i = 0; i < 3; i++) {
-      const dragon = this.physics.add.sprite(200 + i * 200, 500, '').setDisplaySize(40, 40).setTint(0xff0000);
+      const dragon = this.physics.add.sprite(200 + i * 200, 500, '').setDisplaySize(40, 40).setTint(0xffff00);
       dragon.setVelocityX(50 * (i % 2 === 0 ? 1 : -1));
       dragon.setCollideWorldBounds(true);
       dragon.setBounce(1);
@@ -115,17 +116,19 @@ class MainScene extends Phaser.Scene {
       this.player.setVelocityX(-160);
       this.player.anims.play('run-right', true);
       this.player.setFlipX(true); // Mirror the sprite for left movement
+      this.lastDirection = 'left';
     } else if (this.cursors.right?.isDown) {
       this.player.setVelocityX(160);
       this.player.anims.play('run-right', true);
       this.player.setFlipX(false); // Default orientation for right movement
+      this.lastDirection = 'right';
     } else {
       this.player.setVelocityX(0);
       this.player.anims.play('idle', true);
     }
 
     if (this.cursors.up?.isDown && this.player.body!.touching.down) {
-      this.player.setVelocityY(-460); // Double the jump velocity
+      this.player.setVelocityY(-550); // Double the jump velocity
     }
 
     // Check if player falls off screen
@@ -136,9 +139,11 @@ class MainScene extends Phaser.Scene {
 
     // Shooting (space key)
     if (Phaser.Input.Keyboard.JustDown(this.cursors.space!)) {
-      const bullet = this.add.rectangle(this.player.x, this.player.y, 10, 5, 0xffff00);
+      const bulletX = this.lastDirection === 'right' ? this.player.x + 5 : this.player.x - 5;
+      const bulletVelocity = this.lastDirection === 'right' ? 1200 : -1200;
+      const bullet = this.add.rectangle(bulletX, this.player.y - 17, 7, 3, 0xffff00);
       this.physics.add.existing(bullet);
-      (bullet.body as Phaser.Physics.Arcade.Body).velocity.x = 300;
+      (bullet.body as Phaser.Physics.Arcade.Body).velocity.x = bulletVelocity;
     }
   }
 
@@ -155,7 +160,7 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { x: 0, y: 500 },
+      gravity: { x: 0, y: 1200 },
       debug: false,
     },
   },
