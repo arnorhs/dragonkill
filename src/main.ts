@@ -4,7 +4,7 @@ class MainScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys | null;
   private dragons!: Phaser.Physics.Arcade.Group;
-  private princess!: Phaser.GameObjects.Rectangle;
+  private princess!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
 
   constructor() {
     super('MainScene');
@@ -12,10 +12,13 @@ class MainScene extends Phaser.Scene {
 
   preload() {
     // Load the player sprite sheet
-    this.load.spritesheet('prinz', 'public/sprites/prinz.png', {
+    this.load.spritesheet('prinz', '/sprites/prinz.png', {
       frameWidth: 64,
       frameHeight: 64,
     });
+
+    // Load the princess sprite
+    this.load.image('prinsessa', '/sprites/prinsessa.png');
   }
 
   create() {
@@ -39,7 +42,7 @@ class MainScene extends Phaser.Scene {
     platforms.add(platform2);
 
     // Create the player (prince)
-    this.player = this.physics.add.sprite(50, 500, '').setDisplaySize(32, 32)
+    this.player = this.physics.add.sprite(50, 500, 'prinz')
     //this.player.body?.setOffset(17, 28)
     this.player.body?.setSize(15, 45);
     this.player.body?.setOffset(24, 12)
@@ -56,14 +59,16 @@ class MainScene extends Phaser.Scene {
     }
 
     // Create the princess
-    this.princess = this.add.rectangle(750, 500, 40, 60, 0xffc0cb);
-    this.physics.add.existing(this.princess, true);
+    this.princess = this.physics.add.sprite(700, 400, 'prinsessa').setScale(0.4);
+    this.princess.body?.setSize(40, 80);
+    this.princess.body?.setOffset(44, 40);
 
     // Add collisions
     this.physics.add.collider(this.player, ground);
     this.physics.add.collider(this.player, platforms);
     this.physics.add.collider(this.dragons, ground);
     this.physics.add.collider(this.dragons, platforms);
+    this.physics.add.collider(this.princess, ground);
 
     // Add overlap for saving the princess
     this.physics.add.overlap(
