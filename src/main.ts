@@ -1,5 +1,6 @@
 import Phaser from "phaser"
 import GameOverScene from "./scenes/GameOverScene"
+import { Bullet } from "./gameObjects/Bullet"
 
 class MainScene extends Phaser.Scene {
   private map!: Phaser.Tilemaps.Tilemap
@@ -8,6 +9,11 @@ class MainScene extends Phaser.Scene {
   private dragons!: Phaser.Physics.Arcade.Group
   private princess!: Phaser.Physics.Arcade.Sprite
   private lastDirection: "left" | "right" = "right" // Track the last direction the player was facing
+  private bullets!: Phaser.Physics.Arcade.Group // Add a group for bullets
+  private lastShotTime = 0
+  private shotDelay = 200 // Delay between shots in milliseconds
+  private jumpCount = 0
+  private maxJumpCount = 2 // Allow double jump
 
   constructor() {
     super("MainScene")
@@ -171,7 +177,10 @@ class MainScene extends Phaser.Scene {
     wallsLayer.setCollisionByProperty({ collides: true })
 
     // Add collisions between the player and the layers
-    this.physics.add.collider(this.player, platformsLayer)
+    this.physics.add.collider(this.player, platformsLayer, (player, tile) => {
+      this.jumpCount = 0
+    })
+
     this.physics.add.collider(this.player, wallsLayer)
 
     // Add collisions for dragons and princess
@@ -184,7 +193,7 @@ class MainScene extends Phaser.Scene {
     this.physics.add.overlap(
       this.player,
       this.princess,
-      () => this.savePrincess(),
+      () => this.scene.start("GameOverScene"),
       undefined,
       this,
     )
@@ -200,6 +209,18 @@ class MainScene extends Phaser.Scene {
     // Add a toggle for the debug overlay using the D key
     this.input.keyboard?.addKey("I")?.on("down", () => {
       debugGraphic.setVisible(!debugGraphic.visible)
+    })
+
+    // Create a group for bullets
+    this.bullets = this.physics.add.group({
+      classType: Bullet,
+      gravityY: 0,
+    })
+
+    // Add collision detection between bullets and dragons
+    this.physics.add.overlap(this.bullets, this.dragons, (bullet, dragon) => {
+      ;(bullet as Phaser.GameObjects.Rectangle).destroy() // Destroy the bullet
+      ;(dragon as Phaser.Physics.Arcade.Sprite).destroy() // Destroy the dragon
     })
   }
 
@@ -222,8 +243,12 @@ class MainScene extends Phaser.Scene {
       this.player.anims.play("idle", true)
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
-      this.player.setVelocityY(-550) // Double the jump velocity
+    if (
+      Phaser.Input.Keyboard.JustDown(this.cursors.up!) &&
+      this.jumpCount < this.maxJumpCount
+    ) {
+      this.player.setVelocityY(-550)
+      this.jumpCount++
     }
 
     // Check if player falls off screen
@@ -232,31 +257,19 @@ class MainScene extends Phaser.Scene {
       this.scene.restart() // Restart the game
     }
 
-    // Shooting (space key)
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.space!)) {
+    if (
+      this.cursors.space.isDown &&
+      this.time.now > this.lastShotTime + this.shotDelay
+    ) {
       const bulletX =
         this.lastDirection === "right" ? this.player.x + 5 : this.player.x - 5
       const bulletVelocity = this.lastDirection === "right" ? 1200 : -1200
-      const bullet = this.add.rectangle(
-        bulletX,
-        this.player.y - 17,
-        7,
-        3,
-        0xffff00,
-      )
-      this.physics.add.existing(bullet)
-      ;(bullet.body as Phaser.Physics.Arcade.Body).velocity.x = bulletVelocity
+      const bullet = this.bullets.create(bulletX, this.player.y - 17, "bullet")
+      bullet.body.velocity.x = bulletVelocity
 
-      // Add collision detection between bullets and dragons
-      this.physics.add.overlap(bullet, this.dragons, (bullet, dragon) => {
-        ;(bullet as Phaser.GameObjects.Rectangle).destroy() // Destroy the bullet
-        ;(dragon as Phaser.Physics.Arcade.Sprite).destroy() // Destroy the dragon
-      })
+      this.lastShotTime = this.time.now
     }
-  }
-
-  savePrincess() {
-    this.scene.start("GameOverScene")
+    // update shot time
   }
 }
 
