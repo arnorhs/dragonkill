@@ -4,10 +4,10 @@ import { Bullet } from "./gameObjects/Bullet"
 
 class MainScene extends Phaser.Scene {
   private map!: Phaser.Tilemaps.Tilemap
-  private player!: Phaser.Physics.Arcade.Sprite
+  private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys | null
   private dragons!: Phaser.Physics.Arcade.Group
-  private princess!: Phaser.Physics.Arcade.Sprite
+  private princess!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
   private lastDirection: "left" | "right" = "right" // Track the last direction the player was facing
   private bullets!: Phaser.Physics.Arcade.Group // Add a group for bullets
   private lastShotTime = 0
@@ -44,13 +44,13 @@ class MainScene extends Phaser.Scene {
         name: "player",
         classType: Phaser.Physics.Arcade.Sprite,
         scene: this,
-      }) as Phaser.Physics.Arcade.Sprite[]
+      }) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody[]
     )[0]
     this.physics.world.enable(this.player)
     this.player.setTexture("prinz")
-    this.player.body?.setSize(15, 45)
-    this.player.body?.setOffset(24, 12)
-    this.player.setCollideWorldBounds(false) // Allow the player to fall off the screen
+    this.player.body.setSize(15, 45)
+    this.player.body.setOffset(24, 12)
+    this.player.setCollideWorldBounds(true)
   }
 
   createPrincess() {
@@ -59,12 +59,12 @@ class MainScene extends Phaser.Scene {
         name: "princess",
         classType: Phaser.Physics.Arcade.Sprite,
         scene: this,
-      }) as Phaser.Physics.Arcade.Sprite[]
+      }) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody[]
     )[0]
     this.physics.world.enable(this.princess)
     this.princess.setTexture("prinsessa")
-    this.princess.body?.setSize(40, 80)
-    this.princess.body?.setOffset(44, 40)
+    this.princess.body.setSize(40, 80)
+    this.princess.body.setOffset(44, 40)
   }
 
   createDragons() {
@@ -73,7 +73,7 @@ class MainScene extends Phaser.Scene {
     const dragons = this.map.createFromObjects("items", {
       name: "dragon",
       classType: Phaser.Physics.Arcade.Sprite,
-    }) as Phaser.Physics.Arcade.Sprite[]
+    }) as Phaser.Types.Physics.Arcade.SpriteWithDynamicBody[]
 
     this.dragons.addMultiple(dragons)
 
@@ -85,7 +85,8 @@ class MainScene extends Phaser.Scene {
       dragon.setVelocityX(50 * vel)
       vel *= -1
       dragon.setCollideWorldBounds(true, 1, 0, true)
-      dragon.body?.setSize(40, 40)
+      dragon.body.setSize(30, 50)
+      dragon.body.setOffset(15, 11)
       dragon.anims.play("dragon-right", true)
       dragon.setFlipX(vel > 0) // Mirror the sprite for left movement
     }
@@ -121,47 +122,28 @@ class MainScene extends Phaser.Scene {
     this.map = this.make.tilemap({ key: "dragonzmap" })
     const tileset = this.map.addTilesetImage("texturesfordragonz", "textures")
 
-    this.createPlayer()
-    this.createPrincess()
-    this.createDragons()
-
-    this.cameras.main.startFollow(this.player)
-
-    this.physics.world.on(
-      "worldbounds",
-      (
-        body: Phaser.Physics.Arcade.Body,
-        _blockedUp: boolean,
-        blockedDown: boolean,
-        _blockedLeft: boolean,
-        _blockedRight: boolean,
-      ) => {
-        if (
-          blockedDown &&
-          this.dragons.contains(body.gameObject) &&
-          body.gameObject instanceof Phaser.Physics.Arcade.Sprite
-        ) {
-          this.dragons.remove(body.gameObject, true, true)
-        }
-      },
-    )
-
     // Ensure tileset is not null
     if (!tileset) {
       throw new Error("Tileset 'texturesfordragonz' could not be loaded.")
     }
 
     // Create layers from the tilemap
-    const platformsLayer = this.map.createLayer("platforms", tileset)
-    const wallsLayer = this.map.createLayer("walls", tileset)
+    const bgLayer = this.map.createLayer("background", tileset)
+    const wallsLayer = this.map.createLayer("static", tileset)
     const lavaLayer = this.map.createLayer("lava", tileset)
 
     // Ensure layers are not null
-    if (!platformsLayer || !wallsLayer) {
+    if (!wallsLayer || !lavaLayer || !bgLayer) {
       throw new Error(
         "One or more layers could not be created from the tilemap.",
       )
     }
+
+    this.createPlayer()
+    this.createPrincess()
+    this.createDragons()
+
+    this.cameras.main.startFollow(this.player)
 
     // Extend the playable area
     this.physics.world.setBounds(0, 0, wallsLayer.width, wallsLayer.height)
@@ -172,22 +154,30 @@ class MainScene extends Phaser.Scene {
       this.physics.world.bounds.height,
     )
 
-    // Enable collision for the layers
-    platformsLayer.setCollisionByProperty({ collides: true })
     wallsLayer.setCollisionByProperty({ collides: true })
+    lavaLayer.setCollisionByProperty({ collides: true })
 
     // Add collisions between the player and the layers
-    this.physics.add.collider(this.player, platformsLayer, (player, tile) => {
+    this.physics.add.collider(this.player, wallsLayer, (player, tile) => {
       this.jumpCount = 0
     })
 
-    this.physics.add.collider(this.player, wallsLayer)
-
     // Add collisions for dragons and princess
-    this.physics.add.collider(this.dragons, platformsLayer)
     this.physics.add.collider(this.dragons, wallsLayer)
-    this.physics.add.collider(this.princess, platformsLayer)
     this.physics.add.collider(this.princess, wallsLayer)
+
+    this.physics.add.collider(this.player, lavaLayer, () => {
+      // need better die effect
+      this.player.setActive(false).setVisible(false) // Disable player
+      this.scene.restart() // Restart the game
+    })
+
+    for (const dragon of this.dragons.children.entries) {
+    }
+    this.physics.add.overlap(this.dragons, lavaLayer, (dragon, lava) => {
+      console.log("Dragon fell into lava", dragon, lava)
+      // dragon.destroy()
+    })
 
     // Add overlap for saving the princess
     this.physics.add.overlap(
@@ -219,8 +209,8 @@ class MainScene extends Phaser.Scene {
 
     // Add collision detection between bullets and dragons
     this.physics.add.overlap(this.bullets, this.dragons, (bullet, dragon) => {
-      ;(bullet as Phaser.GameObjects.Rectangle).destroy() // Destroy the bullet
-      ;(dragon as Phaser.Physics.Arcade.Sprite).destroy() // Destroy the dragon
+      bullet.destroy()
+      dragon.destroy()
     })
   }
 
@@ -249,12 +239,6 @@ class MainScene extends Phaser.Scene {
     ) {
       this.player.setVelocityY(-550)
       this.jumpCount++
-    }
-
-    // Check if player falls off screen
-    if (this.player.y > this.physics.world.bounds.height) {
-      this.player.setActive(false).setVisible(false) // Disable player
-      this.scene.restart() // Restart the game
     }
 
     if (
