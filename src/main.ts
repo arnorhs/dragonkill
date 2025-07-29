@@ -29,7 +29,8 @@ class MainScene extends Phaser.Scene {
 
     // Load the tilemap and tileset
     this.load.tilemapTiledJSON("dragonzmap", "/maps/dragonzmap.json")
-    this.load.image("textures", "/tilemaps/texturesfordragonz.png")
+    this.load.image("texturesfordragonz", "/tilemaps/texturesfordragonz.png")
+    this.load.image("salla-sjor", "/tilemaps/salla-sjor.png")
   }
 
   createPlayer() {
@@ -89,20 +90,31 @@ class MainScene extends Phaser.Scene {
 
     // Add the tilemap to the scene
     this.map = this.make.tilemap({ key: "dragonzmap" })
-    const tileset = this.map.addTilesetImage("texturesfordragonz", "textures")
+    const tileset = this.map.addTilesetImage(
+      "texturesfordragonz",
+      "texturesfordragonz",
+    )
+    const tilesetSS = this.map.addTilesetImage("salla-sjor", "salla-sjor")
 
     // Ensure tileset is not null
     if (!tileset) {
-      throw new Error("Tileset 'texturesfordragonz' could not be loaded.")
+      throw new Error("Tileset could not be loaded.")
     }
 
+    if (!tilesetSS) {
+      throw new Error("Tileset 'tilesetSS' could not be loaded.")
+    }
+
+    const allTiles = [tileset, tilesetSS]
+
     // Create layers from the tilemap
-    const bgLayer = this.map.createLayer("background", tileset)
-    const wallsLayer = this.map.createLayer("static", tileset)
-    const lavaLayer = this.map.createLayer("lava", tileset)
+    const bgLayer = this.map.createLayer("background", allTiles)
+    const wallsLayer = this.map.createLayer("static", allTiles)
+    const lavaLayer = this.map.createLayer("lava", allTiles)
+    const waterLayer = this.map.createLayer("water", allTiles)
 
     // Ensure layers are not null
-    if (!wallsLayer || !lavaLayer || !bgLayer) {
+    if (!wallsLayer || !lavaLayer || !bgLayer || !waterLayer) {
       throw new Error(
         "One or more layers could not be created from the tilemap.",
       )
@@ -125,6 +137,7 @@ class MainScene extends Phaser.Scene {
 
     wallsLayer.setCollisionByProperty({ collides: true })
     lavaLayer.setCollisionByProperty({ collides: true })
+    waterLayer.setCollisionByProperty({ collides: true })
 
     this.physics.add.collider(this.player, wallsLayer, () => {
       this.player.resetJumpCount()
@@ -134,6 +147,12 @@ class MainScene extends Phaser.Scene {
     this.physics.add.collider(this.princess, wallsLayer)
 
     this.physics.add.collider(this.player, lavaLayer, () => {
+      // need better die effect
+      this.player.setActive(false).setVisible(false) // Disable player
+      this.scene.restart() // Restart the game
+    })
+
+    this.physics.add.collider(this.player, waterLayer, () => {
       // need better die effect
       this.player.setActive(false).setVisible(false) // Disable player
       this.scene.restart() // Restart the game
